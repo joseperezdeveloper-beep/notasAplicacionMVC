@@ -1,0 +1,229 @@
+﻿@{
+    ViewData["Title"] = "Notas";
+    var apiBase = (string)ViewBag.ApiBase ?? "";
+}
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<h1>Registro de Notas</h1>
+
+<div class="card" style="padding:1rem; margin-bottom:1rem;">
+    <h4>Registrar/Editar notas</h4>
+    <div class="row g-2">
+        <input type="hidden" id="IdNota" />
+        <div class="col-md-3">
+            <label>Estudiante</label>
+            <select id="IdEstudiante" class="form-control"></select>
+        </div>
+        <div class="col-md-3">
+            <label>Carrera</label>
+            <select id="IdCarrera" class="form-control"></select>
+        </div>
+        <div class="col-md-3">
+            <label>Materia</label>
+            <select id="IdMateria" class="form-control"></select>
+        </div>
+        <div class="col-md-1">
+            <label>Nota 1</label>
+            <input id="Nota1" type="number" step="0.01" class="form-control" />
+        </div>
+        <div class="col-md-1">
+            <label>Nota 2</label>
+            <input id="Nota2" type="number" step="0.01" class="form-control" />
+        </div>
+        <div class="col-md-1">
+            <label>Nota 3</label>
+            <input id="Nota3" type="number" step="0.01" class="form-control" />
+        </div>
+    </div>
+    <div class="mt-2">
+        <button id="btnGuardar" class="btn btn-primary">Guardar Notas</button>
+        <button id="btnCancelar" class="btn btn-secondary" style="display:none;">Cancelar edición</button>
+    </div>
+    <div id="msg" class="mt-2"></div>
+</div>
+
+<div class="card" style="padding:1rem;">
+    <h4>Listado de notas</h4>
+    <table class="table table-striped" id="tablaNotas">
+        <thead>
+            <tr>
+                <th>Estudiante</th>
+                <th>Carrera</th>
+                <th>Materia</th>
+                <th>Nota 1</th>
+                <th>Nota 2</th>
+                <th>Nota 3</th>
+                <th>Promedio</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+    const API_BASE = '@apiBase';
+
+    function mostrarMensaje(tipo, texto) {
+        $("#msg").html(`<div class="alert alert-${tipo}" role="alert">${texto}</div>`);
+        setTimeout(() => $("#msg").html(""), 4000);
+    }
+
+    function limpiarFormulario() {
+        $("#IdNota").val("");
+        $("#Nota1, #Nota2, #Nota3").val("");
+        $("#btnGuardar").text("Guardar");
+        $("#btnCancelar").hide();
+    }
+
+    function cargarDropdowns() {
+        // Cargar estudiantes
+        $.get(API_BASE + "/api/Estudiantes/listar", function(data){
+            const sel = $("#IdEstudiante");
+            sel.empty();
+            data.forEach(e => sel.append(`<option value="${e.idEstudiante}">${e.nombre}</option>`));
+        });
+
+        // Cargar carreras
+        $.get(API_BASE + "/api/Carreras/listar", function(data){
+            const sel = $("#IdCarrera");
+            sel.empty();
+            data.forEach(c => sel.append(`<option value="${c.idCarrera}">${c.nombreCarrera}</option>`));
+        });
+
+        // Cargar materias
+        $.get(API_BASE + "/api/Materias/listar", function(data){
+            const sel = $("#IdMateria");
+            sel.empty();
+            data.forEach(m => sel.append(`<option value="${m.idMateria}">${m.nombreMateria}</option>`));
+        });
+    }
+
+    function cargarNotas() {
+        $.ajax({
+            url: API_BASE + "/api/Notas/listar",
+            method: "GET",
+            success: function(data){
+                const tbody = $("#tablaNotas tbody");
+                tbody.empty();
+                if(data && data.length > 0){
+                    data.forEach(n => {
+                        tbody.append(`<tr>
+                            <td>${n.nombre}</td>
+                            <td>${n.nombreCarrera}</td>
+                            <td>${n.nombreMateria}</td>
+                            <td>${n.nota1}</td>
+                            <td>${n.nota2}</td>
+                            <td>${n.nota3}</td>
+                            <td>${n.promedioFinal}</td>
+                            <td>
+                            <button class="btn btn-sm btn-warning btnEditar"
+                                    data-id="${n.idNota}"
+                                    data-n1="${n.nota1}"
+                                    data-n2="${n.nota2}"
+                                    data-n3="${n.nota3}"
+                                    data-idestudiante="${n.idEstudiante}"
+                                    data-idcarrera="${n.idCarrera}"
+                                    data-idmateria="${n.idMateria}">
+                                Editar
+                            </button>
+                            <button class="btn btn-sm btn-danger btnEliminar" data-id="${n.idNota}">Eliminar</button>
+                        </td>
+                        </tr>`);
+                    });
+                } else {
+                    tbody.append(`<tr><td colspan="7">Sin registros</td></tr>`);
+                }
+            },
+            error: function(){
+                mostrarMensaje("danger", "Error al cargar notas");
+            }
+        });
+    }
+
+    function validarNotas(n1, n2, n3) {
+        const vals = [n1, n2, n3].map(Number);
+        return vals.every(v => Number.isFinite(v) && v >= 0 && v <= 100);
+    }
+
+    $(document).ready(function(){
+        cargarDropdowns();
+        cargarNotas();
+
+        $("#btnGuardar").click(function(){
+                    const idNota = $("#IdNota").val();
+            const payload = {
+                IdNota: parseInt(idNota || 0),
+                IdEstudiante: parseInt($("#IdEstudiante").val()),
+                IdCarrera: parseInt($("#IdCarrera").val()),
+                IdMateria: parseInt($("#IdMateria").val()),
+                Nota1: parseFloat($("#Nota1").val()),
+                Nota2: parseFloat($("#Nota2").val()),
+                Nota3: parseFloat($("#Nota3").val())
+            };
+
+            function validarNotas(n1, n2, n3) {
+                const vals = [n1, n2, n3].map(Number);
+                return vals.every(v => Number.isFinite(v) && v >= 0 && v <= 100);
+            }
+
+            const isUpdate = Boolean(idNota);
+            const url = isUpdate ? API_BASE + "/api/Notas/actualizar" : API_BASE + "/api/Notas/insertar";
+            const method = isUpdate ? "PUT" : "POST";
+
+            $.ajax({
+                url,method,
+                contentType: "application/json",
+                data: JSON.stringify(payload),
+                    success: function(res){
+                        mostrarMensaje("success", res.mensaje || (isUpdate ? "Actualizado" : "Guardado"));
+                        limpiarFormulario();
+                        cargarNotas();
+                    },
+                    error: function(xhr){
+                        const msg = xhr.responseJSON?.error || "Error al guardar";
+                        mostrarMensaje("danger", msg);
+                    }
+            });
+        });
+
+
+    // Preparar edición
+    $(document).on("click", ".btnEditar", function(){
+        const id = $(this).data("id");
+        $("#IdNota").val(id);
+        $("#Nota1").val($(this).data("n1"));
+        $("#Nota2").val($(this).data("n2"));
+        $("#Nota3").val($(this).data("n3"));
+        $("#IdEstudiante").val($(this).data("idestudiante"));
+        $("#IdCarrera").val($(this).data("idcarrera"));
+        $("#IdMateria").val($(this).data("idmateria"));
+        $("#btnGuardar").text("Actualizar");
+        $("#btnCancelar").show();
+    });
+
+    // Cancelar edición
+    $("#btnCancelar").click(function(){
+        limpiarFormulario();
+    });
+
+    // Eliminar
+    $(document).on("click", ".btnEliminar", function(){
+        if (!confirm("¿Desea eliminar esta nota?")) return;
+        const id = $(this).data("id");
+        $.ajax({
+            url: API_BASE + "/api/Notas/eliminar/" + id,
+            method: "DELETE",
+            success: function(res){
+                mostrarMensaje("success", res.mensaje || "Eliminado");
+                cargarNotas();
+            },
+            error: function(xhr){
+                const msg = xhr.responseJSON?.error || "Error al eliminar";
+                mostrarMensaje("danger", msg);
+            }
+        });
+    });
+    });
+</script>

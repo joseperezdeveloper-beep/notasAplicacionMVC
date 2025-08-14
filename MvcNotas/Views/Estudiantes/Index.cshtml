@@ -1,0 +1,158 @@
+﻿@{
+    ViewData["Title"] = "Estudiantes";
+    var apiBase = (string)ViewBag.ApiBase ?? "";
+}
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<h1>Estudiantes</h1>
+
+<div class="card" style="padding:1rem; margin-bottom:1rem;">
+    <h4>Registrar estudiante</h4>
+    <div class="row g-2">
+        <div class="col-md-4">
+            <label>Nombre</label>
+            <input id="Nombre" class="form-control" />
+        </div>
+        <div class="col-md-2">
+            <label>Identificación</label>
+            <input id="Identificacion" class="form-control" />
+        </div>
+        <div class="col-md-2">
+            <label>Edad</label>
+            <input id="edad" class="form-control" />
+        </div>
+        <div class="col-md-4" style="margin-top:1.8rem">
+            <button id="btnGuardar" class="btn btn-primary">Guardar</button>
+        </div>
+    </div>
+    <div id="msg" class="mt-2"></div>
+</div>
+
+<div class="card" style="padding:1rem;">
+    <h4>Listado</h4>
+    <table class="table table-striped" id="tablaEstudiantes">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Identificación</th>
+                <th>Edad</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+    const API_BASE = '@apiBase';
+
+    function mostrarMensaje(tipo, texto) {
+        $("#msg").html(`<div class="alert alert-${tipo}" role="alert">${texto}</div>`);
+        setTimeout(() => $("#msg").html(""), 4000);
+    }
+
+    function limpiarFormulario() {
+        $("#Nombre").val("");
+        $("#Identificacion").val("");
+        $("#edad").val("");
+    }
+
+    function cargarEstudiantes() {
+        $.ajax({
+            url: API_BASE + "/api/Estudiantes/listar",
+            method: "GET",
+            success: function (data) {
+                const tbody = $("#tablaEstudiantes tbody");
+                tbody.empty();
+                if (data && data.length > 0) {
+                    data.forEach(e => {
+                        tbody.append(`<tr>
+                            <td>${e.nombre}</td>
+                            <td>${e.identificacion}</td>
+                            <td>${e.edad}</td>
+                            <td>
+                                <button class="btn btn-warning btn-sm" onclick="editarEstudiante(${e.idEstudiante}, '${e.nombre}', '${e.identificacion}', ${e.edad})">Editar</button>
+                            </td>
+                        </tr>`);
+                    });
+                } else {
+                    tbody.append(`<tr><td colspan="4">Sin registros</td></tr>`);
+                }
+            },
+            error: function (xhr) {
+                const msg = xhr.responseJSON?.error || "Error al cargar estudiantes";
+                mostrarMensaje("danger", msg);
+            }
+        });
+    }
+
+            let editando = false;
+    let idEstudianteEdit = null;
+
+    function editarEstudiante(id, nombre, identificacion, edad) {
+        $("#Nombre").val(nombre);
+        $("#Identificacion").val(identificacion);
+        $("#edad").val(edad);
+        idEstudianteEdit = id;
+        editando = true;
+        $("#btnGuardar").text("Actualizar");
+    }
+        cargarEstudiantes();
+
+    $(document).ready(function () {
+
+
+
+    $("#btnGuardar").on("click", function () {
+        const payload = {
+            idEstudiante: idEstudianteEdit,
+            nombre: $("#Nombre").val(),
+            identificacion: $("#Identificacion").val(),
+            edad: $("#edad").val()
+        };
+
+        if (!payload.nombre || !payload.identificacion || !payload.edad) {
+            mostrarMensaje("warning", "Completa todos los campos");
+            return;
+        }
+
+        if (!editando) {
+            $.ajax({
+                url: API_BASE + "/api/Estudiantes/insertar",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(payload),
+                success: function (res) {
+                    mostrarMensaje("success", res.mensaje || "Estudiante registrado");
+                    limpiarFormulario();
+                    cargarEstudiantes();
+                },
+                error: function (xhr) {
+                    const msg = xhr.responseJSON?.error || "Error al registrar estudiante";
+                    mostrarMensaje("danger", msg);
+                }
+            });
+        } else {
+            $.ajax({
+                url: API_BASE + "/api/Estudiantes/actualizar",
+                method: "PUT",
+                contentType: "application/json",
+                data: JSON.stringify(payload),
+                success: function (res) {
+                    mostrarMensaje("success", res.mensaje || "Estudiante actualizado");
+                    limpiarFormulario();
+                    cargarEstudiantes();
+                    editando = false;
+                    idEstudianteEdit = null;
+                    $("#btnGuardar").text("Guardar");
+                },
+                error: function (xhr) {
+                    const msg = xhr.responseJSON?.error || "Error al actualizar estudiante";
+                    mostrarMensaje("danger", msg);
+                }
+            });
+        }
+    });
+
+    });
+</script>
